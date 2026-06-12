@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=popsicle
+Comment=Wayland keystroke overlay
+Exec=/usr/bin/python /home/criech/personal/popsicle/popsicle.py
+Icon=input-keyboard
+Categories=Utility;Accessibility;
+StartupNotify=false
+Terminal=false
