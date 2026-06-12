@@ -2,7 +2,7 @@
 Type=Application
 Name=popsicle
 Comment=Wayland keystroke overlay
-Exec=sg input -c "/usr/bin/python /home/criech/personal/popsicle/popsicle.py"
+Exec=sg input -c "/home/criech/personal/popsicle/zig-out/bin/popsicle"
 Icon=input-keyboard
 Categories=Utility;Accessibility;
 StartupNotify=false
