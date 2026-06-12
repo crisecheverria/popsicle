@@ -148,8 +148,7 @@ class PopsicleApp:
         self.group_entry    = None
         self.group_timer    = None
         self.bubbles        = []   # list of dicts: {text, opacity, is_combo, timer, fade_timer}
-        self.cursor_visible = False
-        self.cursor_timer   = None
+        self.cursor_active  = False
 
         self.window = Gtk.Window(type=Gtk.WindowType.TOPLEVEL)
         GtkLayerShell.init_for_window(self.window)
@@ -235,7 +234,7 @@ class PopsicleApp:
         opacity  = bubble['opacity']
 
         display = text
-        if bubble is self.group_entry and self.cursor_visible:
+        if bubble is self.group_entry and self.cursor_active:
             display = text + '_'
 
         lay = PangoCairo.create_layout(cr)
@@ -273,25 +272,15 @@ class PopsicleApp:
 
         return bh
 
-    # ── Cursor blink ──────────────────────────────────────────────────────────
+    # ── Cursor ────────────────────────────────────────────────────────────────
 
-    def _start_cursor_blink(self):
-        self.cursor_visible = True
-        if not self.cursor_timer:
-            self.cursor_timer = GLib.timeout_add(530, self._blink_tick)
+    def _show_cursor(self):
+        self.cursor_active = True
         self.window.queue_draw()
 
-    def _stop_cursor_blink(self):
-        if self.cursor_timer:
-            GLib.source_remove(self.cursor_timer)
-            self.cursor_timer = None
-        self.cursor_visible = False
+    def _hide_cursor(self):
+        self.cursor_active = False
         self.window.queue_draw()
-
-    def _blink_tick(self):
-        self.cursor_visible = not self.cursor_visible
-        self.window.queue_draw()
-        return GLib.SOURCE_CONTINUE
 
     # ── Bubble lifecycle ──────────────────────────────────────────────────────
 
@@ -348,7 +337,7 @@ class PopsicleApp:
         self.group_text  = ""
         self.group_entry = None
         self.group_timer = None
-        self._stop_cursor_blink()
+        self._hide_cursor()
         return GLib.SOURCE_REMOVE
 
     # ── Key dispatch ──────────────────────────────────────────────────────────
@@ -392,7 +381,7 @@ class PopsicleApp:
                 if self.group_text:
                     self.group_entry['text'] = self.group_text
                     self._reset_group_lifetime(self.group_entry)
-                    self._start_cursor_blink()
+                    self._show_cursor()
                     self.group_timer = GLib.timeout_add(GROUP_TIMEOUT, self._flush_group)
                 else:
                     self._cancel_timers(self.group_entry)
@@ -420,7 +409,7 @@ class PopsicleApp:
             else:
                 self.group_text  = char
                 self.group_entry = self._add_bubble(char)
-            self._start_cursor_blink()
+            self._show_cursor()
             self.group_timer = GLib.timeout_add(GROUP_TIMEOUT, self._flush_group)
 
         return GLib.SOURCE_REMOVE
