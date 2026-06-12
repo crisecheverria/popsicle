@@ -6,7 +6,7 @@ gi.require_version('Gtk', '3.0')
 gi.require_version('GtkLayerShell', '0.1')
 gi.require_version('Pango', '1.0')
 gi.require_version('PangoCairo', '1.0')
-from gi.repository import Gtk, GLib, GtkLayerShell, Pango, PangoCairo
+from gi.repository import Gtk, GLib, GtkLayerShell, Pango, PangoCairo, Gdk
 
 import evdev
 from evdev import ecodes, InputDevice
@@ -38,12 +38,15 @@ PAD_Y          = 14       # vertical text padding inside bubble
 BUBBLE_GAP     = 10       # px between bubbles
 BUBBLE_RADIUS  = 16       # corner radius (not a full pill)
 FONT           = "sans 14"
+STOP_BTN_R     = 14       # radius of the stop button circle
+STOP_BTN_CX    = WINDOW_W - STOP_BTN_R - 8
+STOP_BTN_CY    = WINDOW_H - STOP_BTN_R - 8
 
 # ── Timing ────────────────────────────────────────────────────────────────────
 BUBBLE_LIFETIME = 2500    # ms before fade begins
 FADE_STEPS      = 15
 FADE_INTERVAL   = 33      # ms per step  (~500 ms total)
-GROUP_TIMEOUT   = 1000    # ms to group consecutive chars (longer = more sentence-like)
+GROUP_TIMEOUT   = 2000    # ms to group consecutive chars (longer = more sentence-like)
 MAX_BUBBLES     = 5
 
 # ── Colours (r,g,b,a) ─────────────────────────────────────────────────────────
@@ -170,8 +173,11 @@ class PopsicleApp:
         self.window.connect('draw', self._on_draw)
         self.window.show_all()
 
+        self.window.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        self.window.connect('button-press-event', self._on_button_press)
+
         self.window.realize()
-        self.window.input_shape_combine_region(cairo.Region())
+        self._update_input_shape()
 
     # ── Drawing ───────────────────────────────────────────────────────────────
 
@@ -182,6 +188,8 @@ class PopsicleApp:
         cr.paint()
         cr.set_operator(cairo.OPERATOR_OVER)
 
+        self._draw_stop_button(cr)
+
         # Draw bubbles stacked from the bottom, right-aligned
         y = WINDOW_H
         for bubble in reversed(self.bubbles):
@@ -191,6 +199,34 @@ class PopsicleApp:
             y -= bh + BUBBLE_GAP
 
         return False
+
+    def _update_input_shape(self):
+        """Only the stop button area receives mouse events; everything else is click-through."""
+        r = STOP_BTN_R
+        rect = cairo.RectangleInt(int(STOP_BTN_CX - r), int(STOP_BTN_CY - r), r * 2, r * 2)
+        self.window.input_shape_combine_region(cairo.Region(rect))
+
+    def _draw_stop_button(self, cr):
+        cx, cy, r = STOP_BTN_CX, STOP_BTN_CY, STOP_BTN_R
+        cr.new_path()
+        cr.arc(cx, cy, r, 0, 2 * math.pi)
+        cr.set_source_rgba(0.15, 0.15, 0.20, 0.65)
+        cr.fill()
+        cr.new_path()
+        cr.select_font_face("sans", cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+        cr.set_font_size(14)
+        ext = cr.text_extents("×")
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.80)
+        cr.move_to(cx - ext.width / 2 - ext.x_bearing,
+                   cy - ext.height / 2 - ext.y_bearing)
+        cr.show_text("×")
+
+    def _on_button_press(self, widget, event):
+        dx = event.x - STOP_BTN_CX
+        dy = event.y - STOP_BTN_CY
+        if dx * dx + dy * dy <= STOP_BTN_R * STOP_BTN_R:
+            Gtk.main_quit()
+        return True
 
     def _draw_bubble(self, cr, bubble, bottom_y):
         """Draw one bubble with its bottom edge at bottom_y. Returns bubble height."""
@@ -421,15 +457,18 @@ def parse_args():
                    help="ms a bubble stays visible before fading")
     p.add_argument("--opacity",  default=0.90,            type=float, metavar="0-1",
                    help="bubble background opacity")
-    p.add_argument("--margin",   default=40,              type=int, metavar="PX",
+    p.add_argument("--margin",        default=40,              type=int, metavar="PX",
                    help="px gap from screen edge")
+    p.add_argument("--group-timeout", default=GROUP_TIMEOUT,  type=int, metavar="MS",
+                   help="ms of inactivity before a new bubble starts")
     return p.parse_args()
 
 
 def apply_args(args):
-    global FONT, BUBBLE_LIFETIME, BG_NORMAL, BG_COMBO
+    global FONT, BUBBLE_LIFETIME, GROUP_TIMEOUT, BG_NORMAL, BG_COMBO
     FONT            = args.font
     BUBBLE_LIFETIME = args.lifetime
+    GROUP_TIMEOUT   = args.group_timeout
     # Re-apply opacity to background colours
     r, g, b, _ = BG_NORMAL
     BG_NORMAL = (r, g, b, args.opacity)
