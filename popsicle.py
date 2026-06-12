@@ -17,6 +17,16 @@ import sys
 import math
 import cairo
 import argparse
+import logging
+import os
+
+# When launched without a terminal (e.g. from .desktop), log to file
+LOG_FILE = os.path.expanduser("~/.local/share/popsicle.log")
+if not sys.stderr.isatty():
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+    _log = open(LOG_FILE, "w", buffering=1)
+    sys.stdout = _log
+    sys.stderr = _log
 
 # ── Layout ────────────────────────────────────────────────────────────────────
 WINDOW_W       = 700      # px — width of the overlay area
