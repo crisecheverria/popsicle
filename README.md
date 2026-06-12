@@ -4,22 +4,29 @@ A Wayland-native keystroke overlay that displays your keypresses as chat bubbles
 
 Built with Python, evdev, GTK3 layer shell, and Cairo.
 
+![demo](https://github.com/crisecheverria/popsicle/assets/demo.gif)
+
 ## Features
 
-- Chat-bubble style display anchored to the bottom of the screen
-- Characters group into sentences as you type; space and backspace work naturally
-- Blinking cursor while a bubble is active
-- Modifier combos shown as `Ctrl+C`, `Super+L`, etc.
-- Special keys (arrows, F-keys, Tab) get their own bubble
-- Bubbles fade out automatically
-- Click-through — never interferes with your apps
-- Configurable via command-line flags
+- **Chat-bubble display** anchored to the bottom of the screen
+- **Sentence grouping** — characters accumulate in one bubble as you type; a new bubble starts after a pause
+- **Space & backspace** work naturally inside the active bubble
+- **Blinking cursor** (`_`) while a bubble is being typed
+- **Enter** finalizes the current bubble silently
+- **Modifier combos** (`Ctrl+C`, `Super+L`, `Alt+F4`, etc.) shown in a distinct colour
+- **Special keys** (arrows, F-keys, Tab, Esc, etc.) get their own small bubble
+- **Bubbles fade out** automatically after a configurable lifetime
+- **Click-through overlay** — never blocks clicks on your apps
+- **Stop button** — small `×` in the corner to quit without a terminal
+- **Configurable** via command-line flags
+- **Desktop file** included for launching from your app menu (Walker, Rofi, etc.)
+- **Logs to file** (`~/.local/share/popsicle.log`) when launched without a terminal
 
 ## Requirements
 
 - Wayland compositor with `wlr-layer-shell` support (Hyprland, Sway, river, etc.)
 - `python-gobject`
-- `gtk-layer-shell` + Python GObject bindings
+- `gtk-layer-shell` + GObject introspection bindings
 - `python-evdev`
 - `python-cairo` (pycairo)
 
@@ -45,24 +52,27 @@ Log out and back in (or run `newgrp input` in the current shell) for the change 
 python popsicle.py
 ```
 
+Click the small `×` button in the bottom-right corner of the overlay to stop it.
+
 ### Options
 
-```
---font FONT           Pango font string (default: "sans 14")
---anchor {left,right} screen side to anchor to (default: left)
---lifetime MS         ms before a bubble fades (default: 2500)
---opacity 0-1         bubble background opacity (default: 0.9)
---margin PX           gap from screen edge in px (default: 40)
-```
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--font FONT` | `sans 14` | Pango font string |
+| `--anchor {left,right}` | `left` | Screen side to anchor to |
+| `--lifetime MS` | `2500` | ms a bubble stays visible before fading |
+| `--opacity 0-1` | `0.9` | Bubble background opacity |
+| `--margin PX` | `40` | Gap from screen edge in px |
+| `--group-timeout MS` | `2000` | ms of inactivity before the next keypress starts a new bubble |
 
 Examples:
 
 ```bash
 python popsicle.py --anchor right --font "Inter 16" --opacity 0.85
-python popsicle.py --lifetime 3500 --margin 60
+python popsicle.py --lifetime 3500 --group-timeout 3000 --margin 60
 ```
 
-## Autostart
+## App menu / desktop launcher
 
 Copy the included `.desktop` file to your applications directory:
 
@@ -71,14 +81,10 @@ cp popsicle.desktop ~/.local/share/applications/
 update-desktop-database ~/.local/share/applications/
 ```
 
-You can then launch it from your app menu, or add it to your compositor's autostart. For Hyprland, add to `~/.config/hypr/hyprland.conf`:
-
-```
-exec-once = python /path/to/popsicle/popsicle.py
-```
+You can then launch popsicle from your app menu (Walker, Rofi, etc.).
 
 ## How it works
 
-- **Input**: reads raw keyboard events from `/dev/input/event*` using `evdev` in a background thread
-- **Display**: a transparent `wlr-layer-shell` overlay window rendered entirely with Cairo — no GTK child widgets, which avoids GTK3 layout sizing quirks
-- **Threading**: key events are posted to the GTK main loop via `GLib.idle_add` for thread-safe UI updates
+- **Input** — reads raw keyboard events from `/dev/input/event*` using `evdev` in a background thread; key events are posted to the GTK main loop via `GLib.idle_add` for thread-safe UI updates
+- **Display** — a transparent `wlr-layer-shell` overlay window rendered entirely with Cairo + Pango; no GTK child widgets (GTK3 layout gives them 1×1 allocations in this setup)
+- **Click-through** — `input_shape_combine_region` limits mouse input to only the stop button area; everything else passes through to the windows below
